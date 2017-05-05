@@ -10,8 +10,11 @@
 #include<linux/fs.h> 
 #include<linux/slab.h> 
 #include <asm/io.h>
- 
+
+# define PAGE_SIZE 4096
+
 static struct proc_dir_entry *tempdir, *tempinfo;
+struct page *virt_to_page(void *kaddr);
 static unsigned char * buffer;
 static unsigned char array [12]={0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
 
@@ -24,7 +27,24 @@ static const struct file_operations myproc_fops = {
 };
 
 static int my_map(struct file *flip, struct vm_area_struct *vma){
-    // map vma of user space to a continuous physical space
+    unsigned long page;
+    unsigned char i;
+    unsigned long start = (unsigned long)vma->vm_start;
+    unsigned long end =  (unsigned long)vma->vm_end;
+    unsigned long size = (unsigned long)(end - start);
+    
+    // get physical address
+    page = virt_to_phys(buffer) >> PAGE_SHIFT;
+    
+    // map vma of user space to a continuous physical space which starts from page
+    if(remap_pfn_range(vma, start, page, size, PAGE_SHARED)) {
+        return -1;
+    }
+    
+    for(i = 0; i < 12; i++) {
+        buffer[i] = array[i];
+    }
+    
     return 0;
 }
 
@@ -45,11 +65,15 @@ static int init_myproc_module(void){
 static void allocate_memory(void){
     //allocation memory
     //set the memory as reserved
+    buffer = (unsigned char *)kmalloc(PAGE_SIZE, GFP_KERNEL);
+    SetPageReserved(virt_to_page(buffer));
 }
 
 static void clear_memory(void){
     //clear reserved memory
     //free memory
+    ClearPageReserved(virt_to_page(buffer));
+    kfree(buffer);
 }
 
 static void exit_myproc_module(void){
