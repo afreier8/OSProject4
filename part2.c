@@ -40,7 +40,9 @@ int init_module(void) {
 void cleanup_module(void){
     remove_proc_entry("procEntry123", proc_entry);
     printk(KERN_INFO "procEntry123 unloaded.\n");
-    //vfree(info);
+    
+    // free up allocated memory
+    vfree(info);
 }
 
 ssize_t write_info(struct file *filp, const char __user *buff,  
